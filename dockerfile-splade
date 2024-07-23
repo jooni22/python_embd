@@ -11,9 +11,6 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install additional dependencies for SPLADE
-RUN pip install --no-cache-dir transformers
-
 # Set environment variable to use CUDA
 ENV CUDA_VISIBLE_DEVICES=0
 

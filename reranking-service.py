@@ -4,15 +4,32 @@ from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.util import cos_sim
 from typing import List, Optional, Union
-import uvicorn, time, setproctitle, torch, logging, http, json
+import uvicorn, time, setproctitle, torch, logging, http, json, sys, os
 from starlette.requests import Request
+from loguru import logger
+import aiofiles
+from datetime import datetime
 
 # Wyłączenie domyślnego loggera dostępu Uvicorn
 uvicorn_access = logging.getLogger("uvicorn.access")
 uvicorn_access.disabled = True
 
-logger = logging.getLogger("uvicorn")
-logger.setLevel(logging.getLevelName(logging.DEBUG))
+# Konfiguracja loguru
+logger.remove()  # Usuń domyślny handler
+
+# Dodaj logger dla stdout, aby widzieć logi w konsoli
+logger.add(sys.stdout, colorize=True, format="<green>{time}</green> <level>{message}</level>")
+
+# Ścieżka do pliku logów
+log_file = "logs/reranking_service.log"
+
+# Upewnij się, że katalog logów istnieje
+os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+# Asynchroniczna funkcja do zapisywania logów
+async def async_log_to_file(message: str):
+    async with aiofiles.open(log_file, mode='a') as f:
+        await f.write(f"{datetime.now().isoformat()} - {message}\n")
 
 # Ustawienie nazwy procesu
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
@@ -46,6 +63,11 @@ async def log_request_middleware(request: Request, call_next):
     
     body = await request.body()
     request_copy = Request(request.scope, receive=request._receive)
+    
+    # Log request body
+    log_message = f"REQUEST: {request.method} {url}\nBody: {body.decode()}"
+    await async_log_to_file(log_message)
+    
     response = await call_next(request_copy)
     
     process_time = (time.perf_counter() - start_time) * 1000
@@ -65,7 +87,11 @@ async def log_request_middleware(request: Request, call_next):
     except json.JSONDecodeError:
         input_info = 'invalid_json'
     
-    logger.info(f'{host}:{port} - "{request.method} {url}" {response.status_code} {status_phrase} {formatted_process_time}ms - Input: {input_info}')
+    # Log info
+    log_message = f"INFO: {host}:{port} - \"{request.method} {url}\" {response.status_code} {status_phrase} {formatted_process_time}ms - Input: {input_info}"
+    logger.info(log_message)
+    await async_log_to_file(log_message)
+    
     return response
 
 @app.post("/rerank", response_model=List[RerankResponse])
@@ -99,5 +125,5 @@ if __name__ == "__main__":
     uvicorn.run("reranking-service:app", host="0.0.0.0", port=8000, reload=True)
 
 # Komentarz: Zoptymalizowano przetwarzanie batchowe dla lepszej wydajności
-# Komentarz: Dodano szczegółowe logowanie z czasami wykonania
-# Komentarz: Przeniesiono model na GPU, jeśli jest dostępne
+# Komentarz: Dodano asynchroniczne logowanie do pliku z użyciem aiofiles
+# Komentarz: Logi INFO i request body są zapisywane do jednego pliku

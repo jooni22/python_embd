@@ -4,15 +4,32 @@ from pydantic import BaseModel, RootModel
 from typing import List, Union
 import torch
 from transformers import AutoModelForMaskedLM, AutoTokenizer
-import uvicorn, time, setproctitle, logging, http, json
+import uvicorn, time, setproctitle, logging, http, json, sys, os
 from starlette.requests import Request
+from loguru import logger
+import aiofiles
+from datetime import datetime
 
 # Wyłączenie domyślnego loggera dostępu Uvicorn
 uvicorn_access = logging.getLogger("uvicorn.access")
 uvicorn_access.disabled = True
 
-logger = logging.getLogger("uvicorn")
-logger.setLevel(logging.getLevelName(logging.DEBUG))
+# Konfiguracja loguru
+logger.remove()  # Usuń domyślny handler
+
+# Dodaj logger dla stdout, aby widzieć logi w konsoli
+logger.add(sys.stdout, colorize=True, format="<green>{time}</green> <level>{message}</level>")
+
+# Ścieżka do pliku logów
+log_file = "logs/splade_query_service.log"
+
+# Upewnij się, że katalog logów istnieje
+os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+# Asynchroniczna funkcja do zapisywania logów
+async def async_log_to_file(message: str):
+    async with aiofiles.open(log_file, mode='a') as f:
+        await f.write(f"{datetime.now().isoformat()} - {message}\n")
 
 # Ustawienie nazwy procesu
 MODEL_NAME = 'naver/efficient-splade-VI-BT-large-query'
@@ -60,33 +77,23 @@ async def log_request_middleware(request: Request, call_next):
     
     body = await request.body()
     request_copy = Request(request.scope, receive=request._receive)
+    
+    # Log request body
+    log_message = f"REQUEST: {request.method} {url}\nBody: {body.decode()}"
+    await async_log_to_file(log_message)
+    
     response = await call_next(request_copy)
     
     process_time = (time.perf_counter() - start_time) * 1000
     formatted_process_time = "{0:.2f}".format(process_time)
     host = getattr(getattr(request, "client", None), "host", None)
     port = getattr(getattr(request, "client", None), "port", None)
-    try:
-        status_phrase = http.HTTPStatus(response.status_code).phrase
-    except ValueError:
-        status_phrase = ""
     
-    try:
-        json_body = json.loads(body)
-        input_data = json_body.get('inputs', 'input_list')
-    except json.JSONDecodeError:
-        input_data = 'invalid_json'
+    # Log info
+    log_message = f"INFO: {host}:{port} - \"{request.method} {url}\" {response.status_code} {formatted_process_time}ms"
+    logger.info(log_message)
+    await async_log_to_file(log_message)
     
-    if isinstance(input_data, list):
-        input_count = len(input_data)
-        input_sample = input_data[0] if input_data else ''
-        input_info = f"List[{input_count}]: {input_sample}"
-    else:
-        input_info = str(input_data)
-    
-    input_info = input_info[:150] + '...' if len(input_info) > 150 else input_info
-    
-    logger.info(f'{host}:{port} - "{request.method} {url}" {response.status_code} {status_phrase} {formatted_process_time}ms - Input: {input_info}')
     return response
 
 @app.post("/embed_sparse", response_model=List[EmbedSparseResponse])
@@ -129,5 +136,5 @@ if __name__ == "__main__":
     uvicorn.run("splade-query-service:app", host="0.0.0.0", port=5000, reload=True)
 
 # Komentarz: Zoptymalizowano przetwarzanie batchowe dla lepszej wydajności
-# Komentarz: Dodano szczegółowe logowanie z czasami wykonania
-# Komentarz: Przeniesiono model na GPU, jeśli jest dostępne
+# Komentarz: Dodano asynchroniczne logowanie do pliku z użyciem aiofiles
+# Komentarz: Logi INFO i request body są zapisywane do jednego pliku

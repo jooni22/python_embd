@@ -142,10 +142,10 @@ cython_debug/
 
 # Ignore Docker volumes
 volumes/
-
+*.log
 # Ignore Docker images
 *.tar
-
+.vscode/
 # Ignore Docker containers
 *.log
 *.pid

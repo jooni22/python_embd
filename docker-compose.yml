@@ -7,11 +7,13 @@ services:
       - "6000:6000"
     volumes:
       - ./embedding-service.py:/app/embedding-service.py
+      - ./logs:/app/logs
     deploy:
       restart_policy:
         condition: on-failure
         max_attempts: 3
-    command: ["uvicorn", "embedding-service:app", "--host", "0.0.0.0", "--port", "6000", "--reload"]
+    command: ["python", "embedding-service.py"]    
+    #command: ["uvicorn", "embedding-service:app", "--host", "0.0.0.0", "--port", "6000", "--reload"]
 
   splade-doc-service:
     build:
@@ -21,6 +23,7 @@ services:
       - "4000:4000"
     volumes:
       - ./splade-doc-service.py:/app/splade-doc-service.py
+      - ./logs:/app/logs
     deploy:
       restart_policy:
         condition: on-failure
@@ -32,9 +35,10 @@ services:
       context: .
       dockerfile: dockerfile-splade
     ports:
-      - "5001:5000"
+      - "5000:5000"
     volumes:
       - ./splade-query-service.py:/app/splade-query-service.py
+      - ./logs:/app/logs
     deploy:
       restart_policy:
         condition: on-failure
@@ -49,6 +53,7 @@ services:
       - "8000:8000"
     volumes:
       - ./reranking-service.py:/app/reranking-service.py
+      - ./logs:/app/logs
     deploy:
       restart_policy:
         condition: on-failure
