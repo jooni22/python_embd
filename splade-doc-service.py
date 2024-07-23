@@ -49,13 +49,24 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 model = AutoModelForMaskedLM.from_pretrained(MODEL_NAME).to(device)
 model.eval()  # Ustawienie modelu w tryb ewaluacji
 
-# Wstępne załadowanie modelu
+# Po inicjalizacji modelu
 logger.info("Initializing model...")
-dummy_input = "a"
+dummy_input = "This is a dummy query for SPLADE initialization."
 tokens = tokenizer([dummy_input], return_tensors='pt', padding=True, truncation=True, max_length=512)
 tokens = {k: v.to(device) for k, v in tokens.items()}
+
 with torch.no_grad():
-    _ = model(**tokens)
+    output = model(**tokens)
+    sparse_vec = torch.max(torch.log(1 + torch.relu(output.logits)) * tokens['attention_mask'].unsqueeze(-1), dim=1)[0]
+    non_zero_mask = sparse_vec[0] > 0
+    non_zero_indices = non_zero_mask.nonzero().squeeze(dim=1)
+    non_zero_values = sparse_vec[0][non_zero_mask]
+    sorted_indices = non_zero_values.argsort(descending=True)
+    top_k = min(100, len(sorted_indices))
+    top_indices = non_zero_indices[sorted_indices[:top_k]]
+    top_values = non_zero_values[sorted_indices[:top_k]]
+    _ = [{"index": int(idx), "value": float(val)} for idx, val in zip(top_indices.cpu().tolist(), top_values.cpu().tolist())]
+
 logger.info("Model initialization completed.")
 
 BATCH_SIZE = 32
