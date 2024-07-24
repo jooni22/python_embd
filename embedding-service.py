@@ -147,7 +147,7 @@ async def get_embeddings(request: Request, item: Item):
         model=item.model,
         usage={"prompt_tokens": total_tokens, "total_tokens": total_tokens},
     )
-
+    torch.cuda.empty_cache()
     return response
 
 if __name__ == "__main__":

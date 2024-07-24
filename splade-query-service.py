@@ -140,7 +140,7 @@ async def get_sparse_embedding_query(request: EmbedRequest):
 
             sparse_values = [SparseValue(index=int(idx), value=float(val)) for idx, val in zip(top_indices, top_values)]
             all_sparse_values.append(EmbedSparseResponse(root=sparse_values))
-
+    torch.cuda.empty_cache()
     return all_sparse_values
 
 if __name__ == "__main__":

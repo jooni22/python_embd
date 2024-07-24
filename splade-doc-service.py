@@ -10,6 +10,7 @@ from loguru import logger
 import aiofiles
 from datetime import datetime
 
+access_token = "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"
 # Wyłączenie domyślnego loggera dostępu Uvicorn
 uvicorn_access = logging.getLogger("uvicorn.access")
 uvicorn_access.disabled = True
@@ -32,7 +33,7 @@ async def async_log_to_file(message: str):
         await f.write(f"{datetime.now().isoformat()} - {message}\n")
 
 # Ustawienie nazwy procesu
-MODEL_NAME = 'naver/efficient-splade-VI-BT-large-doc'
+MODEL_NAME = 'naver/splade-v3-doc'
 setproctitle.setproctitle(MODEL_NAME)
 
 app = FastAPI()
@@ -45,9 +46,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info(f"Using device: {device}")
 
 # Załadowanie modelu SPLADE i tokenizera
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForMaskedLM.from_pretrained(MODEL_NAME).to(device)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, token=access_token)
+model = AutoModelForMaskedLM.from_pretrained(MODEL_NAME, token=access_token).to(device)
 model.eval()  # Ustawienie modelu w tryb ewaluacji
+from transformers import AutoTokenizer, AutoModelForMaskedLM
 
 # Po inicjalizacji modelu
 logger.info("Initializing model...")
@@ -69,7 +71,7 @@ with torch.no_grad():
 
 logger.info("Model initialization completed.")
 
-BATCH_SIZE = 32
+BATCH_SIZE = 4
 
 class EmbedRequest(BaseModel):
     inputs: Union[str, List[str]]
@@ -159,7 +161,7 @@ async def get_sparse_embedding(request: EmbedRequest):
 
             sparse_values = [SparseValue(index=int(idx), value=float(val)) for idx, val in zip(top_indices, top_values)]
             all_sparse_values.append(EmbedSparseResponse(root=sparse_values))
-
+    torch.cuda.empty_cache()
     return all_sparse_values
 
 if __name__ == "__main__":

@@ -3,12 +3,12 @@
 # Function to print system information
 print_system_info() {
     echo "System Information:"
-    echo "Processor: $(uname -p)"
+    echo "Processor: $(lscpu | grep "Model name" | head -n 1 | cut -d":" -f2 | xargs)"
     echo "RAM: $(free -g | awk '/^Mem:/{print $2}') GB"
     if command -v nvidia-smi &> /dev/null; then
         echo "GPU: $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader)"
     else
-        echo "No GPU detected"
+        echo "No NVIDIA GPU detected"
     fi
     echo ""
 }
@@ -103,9 +103,9 @@ embedding_url="http://localhost:6000/embeddings"
 splade_doc_url="http://localhost:4000/embed_sparse"
 splade_query_url="http://localhost:5000/embed_sparse"
 reranking_url="http://localhost:8000/rerank"
-number=1
-repeat=1
-async=2  # New parameter for async size
+number=32
+repeat=10
+async=10  # New parameter for async size
 
 # Print system information
 print_system_info

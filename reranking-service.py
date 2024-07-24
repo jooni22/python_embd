@@ -118,7 +118,7 @@ async def get_rerank_embeddings(request: RerankRequest):
         reranked_results.append(reranked_result)
 
     reranked_results = sorted(reranked_results, key=lambda x: x.score, reverse=True)
-
+    torch.cuda.empty_cache()
     return reranked_results
 
 if __name__ == "__main__":
