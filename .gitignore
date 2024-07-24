@@ -153,3 +153,6 @@ volumes/
 
 # Ignore Docker Compose override files
 docker-compose.override.yml
+
+# old benchmark file
+benchmark_tests.py
